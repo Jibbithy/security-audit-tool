@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Security Audit Report — {{ target_url }}</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 40px; color: #222; max-width: 1100px; }
+  h1, h2, h3 { color: #1a1a2e; }
+  .summary-box { background: #f4f4f4; border-left: 6px solid #2196F3; padding: 16px; margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+  th { background: #1a1a2e; color: white; padding: 10px; text-align: left; }
+  td { padding: 8px 10px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) { background: #f9f9f9; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px;
+           font-weight: bold; color: white; text-transform: uppercase; }
+  .badge-critical { background: #b71c1c; }
+  .badge-high { background: #e53935; }
+  .badge-medium { background: #f57c00; }
+  .badge-low { background: #388e3c; }
+  .badge-info { background: #0288d1; }
+  .delta-new { background: #fff3e0; border-left: 4px solid #f57c00; padding: 6px 10px; margin: 4px 0; }
+  .delta-fixed { background: #e8f5e9; border-left: 4px solid #388e3c; padding: 6px 10px; margin: 4px 0; }
+  .delta-regressed { background: #ffebee; border-left: 4px solid #b71c1c; padding: 6px 10px; margin: 4px 0; }
+  .section { margin: 40px 0; }
+  .footer { margin-top: 60px; color: #888; font-size: 12px; border-top: 1px solid #ddd; padding-top: 10px; }
+  a { color: #1565c0; }
+</style>
+</head>
+<body>
+
+<h1>Security Audit Report</h1>
+<p>
+  <strong>Target:</strong> <a href="{{ target_url }}">{{ target_url }}</a><br>
+  <strong>Date:</strong> {{ audit_date }}<br>
+  <strong>Run ID:</strong> {{ run_id }}<br>
+  <strong>Scope:</strong> {{ scope }}
+</p>
+
+<div class="summary-box">
+  <h2>Executive Summary</h2>
+  <p>{{ summary }}</p>
+  <table style="width:auto; min-width:300px">
+    <tr><th>Severity</th><th>Count</th></tr>
+    <tr><td><span class="badge badge-critical">Critical</span></td><td>{{ counts.critical }}</td></tr>
+    <tr><td><span class="badge badge-high">High</span></td><td>{{ counts.high }}</td></tr>
+    <tr><td><span class="badge badge-medium">Medium</span></td><td>{{ counts.medium }}</td></tr>
+    <tr><td><span class="badge badge-low">Low</span></td><td>{{ counts.low }}</td></tr>
+    <tr><td><span class="badge badge-info">Info</span></td><td>{{ counts.info }}</td></tr>
+    <tr><th>Max CVSS Score</th><td><strong>{{ max_cvss }}</strong> / 10.0</td></tr>
+  </table>
+</div>
+
+{% if delta %}
+<div class="section">
+  <h2>Changes Since Last Audit</h2>
+  {% for f in delta.new_findings %}
+  <div class="delta-new"><strong>NEW:</strong> {{ f.title }} ({{ f.cwe_id }}, CVSS {{ f.cvss_score }})</div>
+  {% endfor %}
+  {% for fid in delta.fixed_finding_ids %}
+  <div class="delta-fixed"><strong>FIXED:</strong> {{ fid }}</div>
+  {% endfor %}
+  {% for f in delta.regressed_findings %}
+  <div class="delta-regressed"><strong>REGRESSED:</strong> {{ f.title }} — CVSS now {{ f.cvss_score }}</div>
+  {% endfor %}
+  {% if not delta.new_findings and not delta.fixed_finding_ids and not delta.regressed_findings %}
+  <p>No changes detected since the previous audit.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="section">
+  <h2>Findings</h2>
+  {% if not findings %}
+  <p>No findings detected for this target.</p>
+  {% else %}
+  <table>
+    <tr>
+      <th>#</th><th>Severity</th><th>CVSS</th><th>Title</th><th>CWE</th><th>OWASP</th><th>Component</th><th>Remediation</th>
+    </tr>
+    {% for f in findings | sort(attribute='cvss_score', reverse=True) %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><span class="badge badge-{{ f.severity.value }}">{{ f.severity.value }}</span></td>
+      <td>{{ f.cvss_score }}</td>
+      <td>{{ f.title }}</td>
+      <td><a href="https://cwe.mitre.org/data/definitions/{{ f.cwe_id | replace('CWE-', '') }}.html" target="_blank">{{ f.cwe_id }}</a></td>
+      <td>{{ f.owasp_category }}</td>
+      <td>{{ f.component }}</td>
+      <td>{{ f.remediation }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+
+<div class="section">
+  <h2>Remediation Roadmap</h2>
+  <h3>Immediate (0–7 days) — Critical &amp; High</h3>
+  <ul>
+  {% for f in findings if f.severity.value in ('critical', 'high') %}
+    <li><strong>{{ f.title }}</strong> ({{ f.cwe_id }}): {{ f.remediation }}</li>
+  {% else %}
+    <li>No critical or high severity findings.</li>
+  {% endfor %}
+  </ul>
+  <h3>Short-term (1–2 weeks) — Medium</h3>
+  <ul>
+  {% for f in findings if f.severity.value == 'medium' %}
+    <li><strong>{{ f.title }}</strong>: {{ f.remediation }}</li>
+  {% else %}
+    <li>No medium severity findings.</li>
+  {% endfor %}
+  </ul>
+  <h3>Long-term (30 days) — Low</h3>
+  <ul>
+  {% for f in findings if f.severity.value == 'low' %}
+    <li><strong>{{ f.title }}</strong>: {{ f.remediation }}</li>
+  {% else %}
+    <li>No low severity findings.</li>
+  {% endfor %}
+  </ul>
+</div>
+
+<div class="footer">
+  Generated by Security Audit Orchestration Tool &mdash; {{ audit_date }} &mdash; Powered by Claude AI (claude-sonnet-4-6)
+</div>
+</body>
+</html>
