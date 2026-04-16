@@ -34,3 +34,28 @@ def test_headers_probe_no_findings_when_all_present():
         })
         findings = probe.run("https://example.com", "run1")
     assert findings == []
+
+
+# --- TLS Probe ---
+
+from probes.tls import TLSProbe
+
+
+def test_tls_probe_expired_cert():
+    probe = TLSProbe()
+    fake_cert = {
+        "notAfter": "Jan  1 00:00:00 2020 GMT",
+        "subject": ((("commonName", "example.com"),),),
+        "issuer": ((("organizationName", "Test CA"),),),
+    }
+    with patch("probes.tls.ssl.create_default_context") as mock_ctx_cls, \
+         patch("probes.tls.socket.create_connection") as mock_conn:
+        mock_ctx = MagicMock()
+        mock_ctx_cls.return_value = mock_ctx
+        mock_ssock = MagicMock()
+        mock_ssock.getpeercert.return_value = fake_cert
+        mock_ssock.version.return_value = "TLSv1.3"
+        mock_ctx.wrap_socket.return_value.__enter__.return_value = mock_ssock
+        mock_conn.return_value.__enter__.return_value = MagicMock()
+        findings = probe.run("https://example.com", "run1")
+    assert any("Expired" in f.title for f in findings)
