@@ -76,6 +76,13 @@ class Database:
         ).fetchone()
         return row["run_id"] if row else None
 
+    def get_all_runs(self) -> list[dict]:
+        """Return all runs ordered most-recent first, each with target_url and timestamps."""
+        rows = self.conn.execute(
+            "SELECT run_id, target_url, started_at, completed_at FROM runs ORDER BY started_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     def compute_delta(self, target_url: str, current_run_id: str) -> RunDelta:
         prior_run_id = self.get_prior_run_id(target_url, current_run_id)
         current = self.get_findings_for_run(current_run_id)

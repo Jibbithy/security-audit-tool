@@ -79,7 +79,9 @@ def get_credentials():
                 print(f"  5. Save as: {OAUTH_CLIENT_FILE}")
                 sys.exit(1)
             flow = InstalledAppFlow.from_client_secrets_file(str(OAUTH_CLIENT_FILE), SCOPES)
-            creds = flow.run_local_server(port=0)
+            # run_local_server with open_browser=False prints the URL for manual opening
+            # Works in headless/VSCode environments where no browser can auto-launch
+            creds = flow.run_local_server(port=8088, open_browser=False)
 
         TOKEN_FILE.write_text(creds.to_json())
         print(f"Credentials saved to {TOKEN_FILE}")

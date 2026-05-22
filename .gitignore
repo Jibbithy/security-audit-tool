@@ -1,5 +1,7 @@
 .env
 service-account.json
+oauth-client.json
+oauth-token.json
 *.db
 reports/
 __pycache__/
@@ -8,3 +10,4 @@ __pycache__/
 .venv/
 dist/
 *.egg-info/
+=*

@@ -20,7 +20,8 @@ def test_config_loads_required_vars():
 
 
 def test_config_raises_on_missing_key():
-    with patch.dict(os.environ, {}, clear=True):
+    # Patch load_dotenv to a no-op so the real .env file doesn't populate env vars
+    with patch("dotenv.load_dotenv"), patch.dict(os.environ, {}, clear=True):
         import importlib
         import config as cfg_module
         importlib.reload(cfg_module)

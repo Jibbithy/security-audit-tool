@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
+from datetime import datetime, timezone
 import click
 from config import Config
 from db import Database
@@ -68,6 +69,12 @@ def run(max_concurrent, pdf, dry_run):
             generate_pdf=pdf,
         )
         sheets.write_results(target, findings, trend)
+        sheets.write_results_detail(
+            run_id=run_id,
+            url=target.url,
+            findings=findings,
+            started_at=datetime.now(timezone.utc).strftime("%Y-%m-%d at %H:%M:%S UTC"),
+        )
 
         severity_counts: dict[str, int] = {}
         for f in findings:
@@ -76,7 +83,64 @@ def run(max_concurrent, pdf, dry_run):
         click.echo(f"  [OK] {target.url}  findings={len(findings)} {severity_counts}  trend={trend}")
         click.echo(f"       Report: {report_path}")
 
+    sheets.write_all_results_detail()
     click.echo(f"\nAudit complete. Reports saved to: {config.report_output_dir}/")
+
+
+@cli.command()
+@click.argument("url")
+@click.option("--scope", default="FULL_PASSIVE", help="Probe scope (default: FULL_PASSIVE)")
+def check(url, scope):
+    """Run all probes against a URL and print every finding in detail. No DB or Sheet writes."""
+    from probes.owasp import run_full_passive_audit, _SCOPE_PROBES, _ALL_PROBES
+    from probes.base import Severity
+
+    if not (url.startswith("http://") or url.startswith("https://")):
+        url = "https://" + url
+
+    probe_classes = _SCOPE_PROBES.get(scope, _ALL_PROBES)
+    probe_names = [p.__name__.replace("Probe", "") for p in probe_classes]
+
+    click.echo(f"\nTarget : {url}")
+    click.echo(f"Scope  : {scope}  ({len(probe_classes)} probes: {', '.join(probe_names)})")
+    click.echo("─" * 70)
+
+    severity_colors = {
+        Severity.CRITICAL: "red",
+        Severity.HIGH:     "bright_red",
+        Severity.MEDIUM:   "yellow",
+        Severity.LOW:      "green",
+        Severity.INFO:     "white",
+    }
+
+    import uuid
+    run_id = str(uuid.uuid4())
+    total = 0
+
+    for probe_cls in probe_classes:
+        name = probe_cls.__name__.replace("Probe", "")
+        click.echo(f"\n[{name}]", nl=False)
+        try:
+            findings = probe_cls().run(url, run_id)
+        except Exception as e:
+            click.echo(f"  ERROR: {e}", err=True)
+            continue
+
+        if not findings:
+            click.secho("  ✓ Nothing found", fg="green")
+        else:
+            click.echo()
+            for f in sorted(findings, key=lambda x: x.cvss_score, reverse=True):
+                color = severity_colors.get(f.severity, "white")
+                label = f.severity.value.upper()
+                click.secho(f"  [{label:8}] CVSS {f.cvss_score:4.1f}  {f.title}", fg=color, bold=True)
+                click.echo(f"             {f.cwe_id} | {f.owasp_category}")
+                click.echo(f"             Component : {f.component}")
+                click.echo(f"             Fix       : {f.remediation}")
+            total += len(findings)
+
+    click.echo("\n" + "─" * 70)
+    click.echo(f"Total findings: {total}  (no data was saved — run `python main.py run` to audit and save)")
 
 
 @cli.command()
