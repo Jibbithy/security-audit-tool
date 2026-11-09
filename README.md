@@ -1,5 +1,7 @@
 # Security Audit Tool
 
+[![CI](https://github.com/Jibbithy/security-audit-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/Jibbithy/security-audit-tool/actions/workflows/ci.yml)
+
 Runs passive security checks against a list of websites in parallel. Claude reviews the findings to filter out false positives, and the tool writes an HTML/PDF report for each site, tracking results over time in Google Sheets.
 
 "Passive" means it only reads what a site already serves to any visitor: headers, certificates, DNS records, public files and page source. It doesn't log in, fuzz, brute-force or send attack payloads.
